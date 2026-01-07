@@ -17,101 +17,121 @@ public class N2NClientService
     /// <summary>
     /// 启动N2N核心进程
     /// </summary>
-    public static void StartN2N(N2NConfig config,Action exitCallback,Action<string> okAction)
+    public static async void StartN2N(N2NConfig config,Action exitCallback,Action<string> okAction)
     {
-        // 构造参数
-        List<string> args = new List<string>() {
-            "-c", config.Community,
-            "-l", config.SuperNode,
-            "-d", TapNetworkService.TargetAdapterName
-        };
-
-        if(!string.IsNullOrWhiteSpace(config.Password))
-            args.AddRange("-k",config.Password);
-
-        if(!config.IsAutoGet)
-            args.AddRange("-a",config.VirtualIp);
-
-        //添加额外参数
-        if (!string.IsNullOrWhiteSpace(config.ExtraArgs))
+        try
         {
-            args.AddRange(config.ExtraArgs.Split(' '));
-        }
+            //模拟耗时
+            await Task.Delay(10);
+            // 构造参数
+            List<string> args = new List<string>() {
+                "-c", config.Community,
+                "-l", config.SuperNode,
+                "-d", TapNetworkService.TargetAdapterName
+            };
+            if(!string.IsNullOrWhiteSpace(config.Password))
+                args.AddRange("-k",config.Password);
 
-        string edgePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "resources", "n2n", "edge.exe");
-        if (!File.Exists(edgePath))
-        {
-            throw new Exception("启动失败，未找到核心文件 " + edgePath);
-        }
+            if(!config.IsAutoGet)
+                args.AddRange("-a",config.VirtualIp);
 
-        var arguments = string.Join(" ", args);
-        Log.Information("启动N2N核心服务，参数：{Args}", arguments);
-        var gbk = System.Text.Encoding.GetEncoding("UTF-8");
-        // 配置启动信息
-        ProcessStartInfo psi = new ProcessStartInfo
-        {
-            FileName = edgePath,
-            Arguments = arguments,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true,
-            StandardOutputEncoding = gbk,
-            StandardErrorEncoding = gbk
-        };
-        _edgeProcess = new Process { StartInfo = psi, EnableRaisingEvents = true };
-        // 读取输出日志
-        _edgeProcess.OutputDataReceived += (sender, e) =>
-        {
-            if (!string.IsNullOrEmpty(e.Data))
+            //添加额外参数
+            if (!string.IsNullOrWhiteSpace(config.ExtraArgs))
             {
-                Log.Information("[N2N] {Log}", e.Data);
+                args.AddRange(config.ExtraArgs.Split(' '));
+            }
 
-                // 提取 IP 的逻辑
-                if (e.Data.Contains("created local tap device IP:"))
+            string edgePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "resources", "n2n", "edge.exe");
+            if (!File.Exists(edgePath))
+            {
+                throw new Exception("启动失败，未找到核心文件 " + edgePath);
+            }
+
+            var arguments = string.Join(" ", args);
+            Log.Information("启动N2N核心服务，参数：{Args}", arguments);
+            var gbk = System.Text.Encoding.GetEncoding("UTF-8");
+            // 配置启动信息
+            ProcessStartInfo psi = new ProcessStartInfo
+            {
+                FileName = edgePath,
+                Arguments = arguments,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                StandardOutputEncoding = gbk,
+                StandardErrorEncoding = gbk
+            };
+            _edgeProcess = new Process { StartInfo = psi, EnableRaisingEvents = true };
+            // 读取输出日志
+            _edgeProcess.OutputDataReceived += (sender, e) =>
+            {
+                if (!string.IsNullOrEmpty(e.Data))
                 {
-                    var match = IpRegex.Match(e.Data);
-                    if (match.Success)
+                    Log.Information("[N2N] {Log}", e.Data);
+
+                    // 提取 IP 的逻辑
+                    if (e.Data.Contains("created local tap device IP:"))
                     {
-                        currIp = match.Groups["ip"].Value;
-                        // 这里可以赋值给你的全局变量或 UI
-                        // MainWindow.UiData.LocalIp = localIp;
+                        var match = IpRegex.Match(e.Data);
+                        if (match.Success)
+                        {
+                            currIp = match.Groups["ip"].Value;
+                            // 这里可以赋值给你的全局变量或 UI
+                            // MainWindow.UiData.LocalIp = localIp;
+                        }
+                    }
+
+                    if (e.Data.Contains("[OK] edge")) //连接服务器成功
+                    {
+                        okAction?.Invoke(currIp);
                     }
                 }
+            };
+            _edgeProcess.ErrorDataReceived += (sender, e) =>
+            {
+                if (!string.IsNullOrEmpty(e.Data)) Log.Error("[N2N Error] {Log}", e.Data);
+            };
 
-                if (e.Data.Contains("[OK] edge")) //连接服务器成功
-                {
-                    okAction?.Invoke(currIp);
-                }
-            }
-        };
-        _edgeProcess.ErrorDataReceived += (sender, e) =>
-        {
-            if (!string.IsNullOrEmpty(e.Data)) Log.Error("[N2N Error] {Log}", e.Data);
-        };
+            // 进程退出回调
+            _edgeProcess.Exited += (sender, args) =>
+            {
+                exitCallback?.Invoke();
+            };
 
-        // 进程退出回调
-        _edgeProcess.Exited += (sender, args) =>
+            if (!_edgeProcess.Start()) throw new Exception("无法启动进程");
+            _edgeProcess.BeginOutputReadLine();
+            _edgeProcess.BeginErrorReadLine();
+            // 绑定 JobManager (确保程序退出时杀掉子进程)
+            JobManager.AddProcess(_edgeProcess);
+        }
+        catch (Exception e)
         {
+            Log.Error(e, "启动N2N进程失败");
             exitCallback?.Invoke();
-        };
-
-        if (!_edgeProcess.Start()) throw new Exception("无法启动进程");
-        _edgeProcess.BeginOutputReadLine();
-        _edgeProcess.BeginErrorReadLine();
-        // 绑定 JobManager (确保程序退出时杀掉子进程)
-        JobManager.AddProcess(_edgeProcess);
+        }
     }
 
     /// <summary>
     /// 停止N2N进程
     /// </summary>
-    public static void StopN2N()
+    public static async void StopN2N()
     {
-        if (_edgeProcess != null && !_edgeProcess.HasExited)
+        try
         {
-            _edgeProcess.Kill();
-            _edgeProcess.WaitForExit(2000);
+            if (_edgeProcess != null && !_edgeProcess.HasExited)
+            {
+                _edgeProcess.Kill();
+                bool exited = await Task.Run(() => _edgeProcess.WaitForExit(2000));
+                if (!exited)
+                {
+                    Log.Warning("N2N进程未能在2秒内正常退出");
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Log.Error(e, "停止N2N进程失败");
         }
     }
 }

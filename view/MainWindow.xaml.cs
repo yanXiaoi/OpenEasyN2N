@@ -78,6 +78,7 @@ public partial class MainWindow : Window
             if (!this.StartStatus)
             {
                 this.StartButton.Content = "连接中...";
+                this.StartButton.Background = Brushes.DarkGray;
                 //保存配置
                 N2NConfig config = GetConfigFromUi();
                 AppTool.SaveDataToFile("config/config.json", config);
@@ -88,34 +89,35 @@ public partial class MainWindow : Window
                     AppTool.RunUI(() =>
                     {
                         this.CurrentIpText.Text = "0.0.0.0";
-                        this.StartButton.Background = Brushes.Green;
+                        this.StartButton.Background = AppTool.GetBrushColor("#007ACC");
                         this.StartButton.Content = "启动连接";
+                        this.StartButton.IsEnabled = true;
                     });
                 }, (ip) =>
                 {
                     AppTool.RunUI(() =>
                     {
+                        this.StartStatus = true;
+                        this.StartButton.Background = Brushes.OrangeRed;
+                        this.StartButton.Content = "停止连接";
+                        this.StartButton.IsEnabled = true;
+
                         this.CurrentIpText.Text = ip;
                         this.StatusDot.Fill = AppTool.GetBrushColor("#00FF00");
                         this.StatusText.Text = "已连接";
                     });
                     Log.Information("N2N 已成功连接超级节点");
                 });
-                this.StartStatus = true;
-                this.StartButton.Background = Brushes.OrangeRed;
-                this.StartButton.Content = "停止连接";
             }else
             {
+                this.StartButton.Content = "停止中...";
+                this.StartButton.Background = Brushes.DarkGray;
                 N2NClientService.StopN2N();
-                this.StartButton.Background = Brushes.Green;
-                this.StartButton.Content = "启动连接";
             }
         }
         catch (Exception exception)
         {
             MessageBox.Show("启动失败 "+exception.Message);
-        }finally
-        {
             this.StartButton.IsEnabled = true;
         }
     }
