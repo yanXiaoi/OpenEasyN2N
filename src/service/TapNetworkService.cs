@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Management;
 using System.Net.NetworkInformation;
 using Serilog;
 
@@ -13,12 +14,12 @@ public class TapNetworkService {
      */
     public static async Task<bool> SetupTapEnvironmentAsync(string driverExecutablePath) {
         // 检查是否已经存在名为 指定名称 的网卡
-        if (GetInterfaceByName(TargetAdapterName) != null) {
+        if (GetWmiInterfaceByName(TargetAdapterName) != null) {
             Log.Information("已存在名为 {Name} 的网卡，无需安装", TargetAdapterName);
             return true;
         }
         // 检查是否有未命名的 TAP 网卡存在
-        var unnamedTap = GetUnnamedTapInterface();
+        var unnamedTap = GetUnnamedWmiTapInterface();
         if (unnamedTap == null) {
             // 完全没有驱动，执行静默安装
             if (!File.Exists(driverExecutablePath))
@@ -35,7 +36,7 @@ public class TapNetworkService {
             }
             for (int i = 0; i < 10; i++) {
                 await Task.Delay(1000);
-                unnamedTap = GetUnnamedTapInterface();
+                unnamedTap = GetUnnamedWmiTapInterface();
                 if (unnamedTap != null) break;
             }
             if (unnamedTap == null) {
@@ -45,7 +46,19 @@ public class TapNetworkService {
                 Log.Information("虚拟网卡安装成功");
             }
         }
-        return ConfigureAdapter(unnamedTap.Name);
+
+        string? nicName = unnamedTap["NetConnectionID"]?.ToString();
+        if (string.IsNullOrEmpty(nicName))
+        {
+            // 如果没有友好名称，通常 fallback 到 Description
+            nicName = unnamedTap["Description"]?.ToString();
+        }
+        if (string.IsNullOrEmpty(nicName))
+        {
+            Log.Error("无法获取虚拟网卡名称");
+            return false;
+        }
+        return ConfigureAdapter(nicName);
     }
     public static async Task<bool> UninstallViaExeAsync()
     {
@@ -74,17 +87,25 @@ public class TapNetworkService {
         Log.Warning("未找到系统内置卸载程序，请尝试手动卸载。");
         return false;
     }
-    private static NetworkInterface? GetInterfaceByName(string name) {
-        return NetworkInterface.GetAllNetworkInterfaces()
-            .FirstOrDefault(nic => nic.Name == name);
-    }
-    private static NetworkInterface? GetUnnamedTapInterface() {
-        // 寻找描述里带有 "TAP-Windows" 的网卡
-        return NetworkInterface.GetAllNetworkInterfaces()
-            .FirstOrDefault(nic => nic.Description.Contains("TAP-Windows", StringComparison.OrdinalIgnoreCase)
-                                 && nic.Name != TargetAdapterName);
+    // 根据名称获取网卡
+    private static ManagementObject? GetWmiInterfaceByName(string name)
+    {
+        string query = $"SELECT * FROM Win32_NetworkAdapter WHERE NetConnectionID = '{name}'";
+        using var searcher = new ManagementObjectSearcher(query);
+        return searcher.Get().Cast<ManagementObject>().FirstOrDefault();
     }
 
+    // 寻找描述里带有 "TAP-Windows" 的网卡
+    private static ManagementObject? GetUnnamedWmiTapInterface()
+    {
+        // Description 对应硬件描述，NetConnectionID 对应用户看到的“网络名称”
+        string query = "SELECT * FROM Win32_NetworkAdapter WHERE Description LIKE '%TAP-Windows%'";
+        using var searcher = new ManagementObjectSearcher(query);
+
+        return searcher.Get()
+            .Cast<ManagementObject>()
+            .FirstOrDefault(nic => nic["NetConnectionID"]?.ToString() != TargetAdapterName);
+    }
     private static bool ConfigureAdapter(string currentName) {
         try {
             // 重命名并优化网卡
