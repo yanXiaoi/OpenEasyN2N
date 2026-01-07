@@ -3,6 +3,7 @@ using System.IO;
 using System.Net.NetworkInformation;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using OpenEasyN2N.manager;
@@ -19,6 +20,13 @@ namespace OpenEasyN2N;
 /// </summary>
 public partial class MainWindow : Window
 {
+    // URL 常量
+    private const string GitHubBaseUrl = "https://github.com/yanXiaoi/OpenEasyN2N";
+    private const string GiteeBaseUrl = "https://gitee.com/yanxao/OpenEasyN2N";
+    private const string GitHubUpdateUrl = "https://github.com/yanXiaoi/OpenEasyN2N/releases";
+    private const string GiteeUpdateUrl = "https://gitee.com/yanxao/OpenEasyN2N/releases";
+
+
     public static MainWindow Instance;
     // 启动状态
     public bool StartStatus = false;
@@ -508,4 +516,51 @@ public partial class MainWindow : Window
     }
 
     #endregion
+
+    private void BtnToBaseURL_Click(object sender, RoutedEventArgs e)
+    {
+        var menuItem = sender as MenuItem;
+        if (menuItem != null)
+        {
+            string url = menuItem.Header.ToString() switch
+            {
+                "GitHub" => GitHubBaseUrl,
+                "Gitee" => GiteeBaseUrl,
+                _ => GitHubBaseUrl
+            };
+            try
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "打开网页失败");
+                MessageBox.Show($"无法打开网页: {ex.Message}");
+            }
+        }
+    }
+
+    private void BtnToUpdateURL_Click(object sender, RoutedEventArgs e)
+    {
+        var menuItem = sender as MenuItem;
+        if (menuItem != null)
+        {
+            string url = menuItem.Header.ToString() switch
+            {
+                "GitHub" => GitHubUpdateUrl,
+                "Gitee" => GiteeUpdateUrl,
+                _ => GitHubUpdateUrl
+            };
+
+            try
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "打开更新页面失败");
+                MessageBox.Show($"无法打开更新页面: {ex.Message}");
+            }
+        }
+    }
 }

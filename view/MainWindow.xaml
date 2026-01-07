@@ -186,7 +186,14 @@
                     <MenuItem Header="卸载虚拟网卡" Click="BtnUninstall_Click"/>
                 </MenuItem>
                 <MenuItem Header="帮助">
-                    <MenuItem Header="关于软件"/>
+                    <MenuItem Header="关于软件">
+                        <MenuItem Header="GitHub" Click="BtnToBaseURL_Click"/>
+                        <MenuItem Header="Gitee" Click="BtnToBaseURL_Click"/>
+                    </MenuItem>
+                    <MenuItem Header="检查更新">
+                        <MenuItem Header="GitHub" Click="BtnToUpdateURL_Click"/>
+                        <MenuItem Header="Gitee" Click="BtnToUpdateURL_Click"/>
+                    </MenuItem>
                 </MenuItem>
             </Menu>
 
