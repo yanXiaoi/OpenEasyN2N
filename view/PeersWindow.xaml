@@ -117,6 +117,20 @@
                       SelectionUnit="FullRow">
 
                 <DataGrid.Columns>
+                    <DataGridTemplateColumn Header="设备名" Width="0.7*">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBox Text="{Binding Name, Mode=OneWay}"
+                                         Foreground="#CCCCCC"
+                                         IsReadOnly="True"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         VerticalAlignment="Center"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+
                     <DataGridTemplateColumn Header="虚拟 IP" Width="1.2*">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>

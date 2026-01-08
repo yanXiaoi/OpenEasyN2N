@@ -152,6 +152,44 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <Style x:Key="ParamTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="#BBBBBB"/>
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <Style TargetType="{x:Type ScrollBar}">
+            <Setter Property="Stylus.IsPressAndHoldEnabled" Value="false"/>
+            <Setter Property="Stylus.IsFlicksEnabled" Value="false"/>
+            <Setter Property="Width" Value="6"/>
+            <Setter Property="Margin" Value="2,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollBar}">
+                        <Grid x:Name="Bg" SnapsToDevicePixels="true" Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="true" IsEnabled="{TemplateBinding IsEnabled}">
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="{x:Type Thumb}">
+                                                <Border Background="#444444" CornerRadius="3" />
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="true">
+                                <Setter TargetName="Bg" Property="Background" Value="#10FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Border CornerRadius="12" Background="#1A1A1B" BorderBrush="#333333" BorderThickness="1">
@@ -324,20 +362,18 @@
                         <Rectangle Height="1" Fill="#252526" Width="100" Margin="0,12,0,8"/> <TextBlock Text="当前分配 IP" FontSize="10" Foreground="#555555" HorizontalAlignment="Center" Margin="0,0,0,5"/>
                         <Border Background="#1A1A1B" CornerRadius="4" Padding="8,3" BorderBrush="#2D2D30" BorderThickness="1" HorizontalAlignment="Center">
                             <TextBox x:Name="CurrentIpText"
-         Text="0.0.0.0"
-         Foreground="{StaticResource AccentBrush}"
-         FontSize="13"
-         FontWeight="Bold"
-         FontFamily="Consolas"
-         HorizontalAlignment="Center"
-         IsReadOnly="True"
-         BorderThickness="0"
-         Background="Transparent"
-         Focusable="True"
-         IsHitTestVisible="True"
-
-         SelectionBrush="#33007ACC" SelectionOpacity="0.3"    FocusVisualStyle="{x:Null}" />
-
+                                 Text="0.0.0.0"
+                                 Foreground="{StaticResource AccentBrush}"
+                                 FontSize="13"
+                                 FontWeight="Bold"
+                                 FontFamily="Consolas"
+                                 HorizontalAlignment="Center"
+                                 IsReadOnly="True"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 Focusable="True"
+                                 IsHitTestVisible="True"
+                                 SelectionBrush="#33007ACC" SelectionOpacity="0.3"    FocusVisualStyle="{x:Null}" />
                         </Border>
                     </StackPanel>
                 </Border>
@@ -353,22 +389,56 @@
             </Border>
 
             <Popup x:Name="ExtraArgsPopup" Placement="Center" AllowsTransparency="True" StaysOpen="False" PopupAnimation="Fade">
-                <Border Background="#2D2D30" BorderBrush="#333333" BorderThickness="1" CornerRadius="8" Width="300" Padding="15">
-                    <StackPanel>
-                        <TextBlock Text="额外启动参数" Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="Bold" Margin="0,0,0,10"/>
-                        <TextBlock Text="输入 n2n 命令行参数 (如: -v -r -E)" Foreground="#888888" FontSize="10" Margin="0,0,0,5"/>
-                        <Border Background="#1A1A1B" CornerRadius="4" Padding="5" BorderBrush="#333333" BorderThickness="1">
+                <Border Background="#2D2D30" BorderBrush="#333333" BorderThickness="1" CornerRadius="8" Width="450" MaxHeight="400" Padding="15">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="100"/> <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/> </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Text="额外启动参数 (n2n 命令行)" Foreground="{StaticResource AccentBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,10"/>
+
+                        <Border Grid.Row="1" Background="#1A1A1B" CornerRadius="4" Padding="5" BorderBrush="#333333" BorderThickness="1">
                             <TextBox x:Name="ExtraArgsTextBox"
                                      FontSize="12"
-                                     Height="60"
                                      AcceptsReturn="True"
                                      TextWrapping="Wrap"
-                                     VerticalContentAlignment="Top"/>
+                                     VerticalContentAlignment="Top"
+                                     CaretBrush="White"
+                                     Foreground="White"/>
                         </Border>
-                    </StackPanel>
+
+                        <TextBlock Grid.Row="2" Text="常用参数速查" Foreground="#666666" FontSize="10" Margin="0,15,0,5"/>
+
+                        <Border Grid.Row="3" Background="#252526" CornerRadius="4" Margin="0,0,0,5">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="100" Padding="8">
+                                <StackPanel>
+                                    <ItemsControl ItemsSource="{Binding}">
+                                        <StackPanel Margin="0,0,0,10">
+                                            <TextBlock Text="网络连接" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,5"/>
+                                            <TextBlock Text="-p [端口] : 固定本地UDP端口" Style="{StaticResource ParamTextStyle}"/>
+                                            <TextBlock Text="-D : 开启PMTU发现 (减少分包)" Style="{StaticResource ParamTextStyle}"/>
+                                            <TextBlock Text="-S1/S2 : 强制转发模式 (不走P2P)" Style="{StaticResource ParamTextStyle}"/>
+                                            <TextBlock Text="-i [秒] : NAT打洞注册间隔 (默认20)" Style="{StaticResource ParamTextStyle}"/>
+
+                                            <TextBlock Text="加密与压缩" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" Margin="0,10,0,5"/>
+                                            <TextBlock Text="-H : 开启报文头加密 (需服务端支持)" Style="{StaticResource ParamTextStyle}"/>
+                                            <TextBlock Text="-z1 : LZO 压缩数据" Style="{StaticResource ParamTextStyle}"/>
+                                            <TextBlock Text="-z2 : ZSTD 压缩数据 (推荐)" Style="{StaticResource ParamTextStyle}"/>
+
+                                            <TextBlock Text="进阶配置" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" Margin="0,10,0,5"/>
+                                            <TextBlock Text="-r : 允许数据转发 (路由功能)" Style="{StaticResource ParamTextStyle}"/>
+                                            <TextBlock Text="-E : 接收多播地址" Style="{StaticResource ParamTextStyle}"/>
+                                            <TextBlock Text="-x [数值] : 设置网卡跃点 (游戏搜不到房设为1)" Style="{StaticResource ParamTextStyle}"/>
+                                            <TextBlock Text="-v : 显示详细运行日志" Style="{StaticResource ParamTextStyle}"/>
+                                        </StackPanel>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Border>
+                    </Grid>
                 </Border>
             </Popup>
-
         </Grid>
     </Border>
 </Window>

@@ -24,7 +24,7 @@ public class N2NManagementService
                 var peers = await GetOnlinePeersAsync();
                 AppTool.RunUI(() =>
                 {
-                    Peers.UpdateIncremental(peers, p => p.VirtualIp+p.MacAddr);
+                    Peers.UpdateIncremental(peers, p => p.ToString());
                 });
             }
         }
@@ -158,4 +158,8 @@ public class N2NPeer
     public string MacAddr { get; set; }
     public string RealAddr { get; set; }
     public string Type { get;set; }
+    public override string ToString()
+    {
+        return $"{Name} {VirtualIp} {MacAddr} {RealAddr} {Type}";
+    }
 }
