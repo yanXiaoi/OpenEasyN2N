@@ -27,6 +27,8 @@ namespace OpenEasyN2N;
 /// </summary>
 public partial class MainWindow : Window
 {
+    // 当前版本
+    private const string Version = "v1.0.1";
     // URL 常量
     private const string GitHubBaseUrl = "https://github.com/yanXiaoi/OpenEasyN2N";
     private const string GiteeBaseUrl = "https://gitee.com/yanxao/OpenEasyN2N";
@@ -72,6 +74,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         // 初始化托盘
         this.InitNotifyIcon();
+        this.VersionText.Text = Version;
         // 初始化自启勾选状态
         this.InitAutoStartStatus();
         //注入配置
