@@ -1,3 +1,4 @@
+using System.Net;
 using OpenEasyN2N.model;
 using OpenEasyN2N.util;
 using Serilog;
@@ -13,17 +14,21 @@ public class N2NManagementService
     private const string AdminHost = "127.0.0.1";
 
     public static ObservableCollectionFast<N2NPeer> Peers { get; } = new ObservableCollectionFast<N2NPeer>();
+    private static readonly UdpClient _adminClient = new UdpClient();
+    private static readonly IPEndPoint _adminEndpoint = new IPEndPoint(IPAddress.Parse(AdminHost), DefaultAdminPort);
     // 开始异步执行
     public static async void Start()
     {
         try
         {
-            using PeriodicTimer timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+            _adminClient.Client.SendTimeout = 1000;
+            _adminClient.Client.ReceiveTimeout = 1000;
+
+            using PeriodicTimer timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
             while (await timer.WaitForNextTickAsync())
             {
                 var peers = await GetOnlinePeersAsync();
-                AppTool.RunUI(() =>
-                {
+                AppTool.RunUI(() => {
                     Peers.UpdateIncremental(peers, p => p.ToString());
                 });
             }
@@ -39,38 +44,27 @@ public class N2NManagementService
         var peers = new List<N2NPeer>();
         try
         {
-            using var client = new UdpClient();
-            client.Client.SendTimeout = 1000;
-            client.Client.ReceiveTimeout = 1000;
-            string command = "peer_list";
-            byte[] requestData = Encoding.ASCII.GetBytes(command);
-            await client.SendAsync(requestData, requestData.Length, AdminHost, DefaultAdminPort);
-
+            byte[] requestData = Encoding.ASCII.GetBytes("peer_list");
+            await _adminClient.SendAsync(requestData, requestData.Length, _adminEndpoint);
             StringBuilder fullResponse = new StringBuilder();
-            var gbkEncoding = Encoding.GetEncoding("UTF-8");
-            // 循环读取，直到没有更多数据包
+            var gbkEncoding = Encoding.UTF8;
             while (true)
             {
+                // 每次读取设置 300ms 令牌
+                using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(300));
                 try
                 {
-                    // 使用 WaitAsync 设置一个短的读取间隙超时（100-300ms 足够了）
-                    var task = client.ReceiveAsync();
-                    if (await Task.WhenAny(task, Task.Delay(300)) == task)
-                    {
-                        var result = await task;
-                        fullResponse.AppendLine(gbkEncoding.GetString(result.Buffer));
-                    }
-                    else
-                    {
-                        // 300ms 没收到新包，认为 edge 已经发完了
-                        break;
-                    }
+                    var result = await _adminClient.ReceiveAsync(cts.Token);
+                    fullResponse.AppendLine(gbkEncoding.GetString(result.Buffer));
+                    if (_adminClient.Available == 0) break;
                 }
-                catch { break; }
+                catch (OperationCanceledException)
+                {
+                    // 300ms 到期，认为本轮数据接收完毕
+                    break;
+                }
             }
-
-            string finalResult = fullResponse.ToString();
-            peers = ParsePeers(finalResult);
+            peers = ParsePeers(fullResponse.ToString());
         }
         catch (Exception ex)
         {
