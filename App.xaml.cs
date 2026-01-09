@@ -1,12 +1,13 @@
 ﻿using System.Diagnostics;
 using System.IO;
-using System.Net;
-using System.Net.Http;
 using System.Windows;
 using OpenEasyN2N.manager;
 using OpenEasyN2N.service;
 using OpenEasyN2N.util;
 using Serilog;
+
+using Application = System.Windows.Application;
+using MessageBox = System.Windows.MessageBox;
 
 namespace OpenEasyN2N;
 

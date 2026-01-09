@@ -50,12 +50,12 @@ public partial class PeersWindow : Window
 
                     if (reply.Status == IPStatus.Success)
                     {
-                        PopupDot.Fill = new SolidColorBrush(Color.FromRgb(0, 255, 0));
+                        PopupDot.Fill = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0, 255, 0));
                         PopupText.Text = $"成功: {reply.RoundtripTime} ms";
                     }
                     else
                     {
-                        PopupDot.Fill = new SolidColorBrush(Color.FromRgb(232, 17, 35));
+                        PopupDot.Fill = new SolidColorBrush(System.Windows.Media.Color.FromRgb(232, 17, 35));
                         PopupText.Text = $"失败: {reply.Status}";
                     }
                 }

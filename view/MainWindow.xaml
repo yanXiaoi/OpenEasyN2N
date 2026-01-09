@@ -36,12 +36,21 @@
                         <Grid x:Name="RootGrid" SnapsToDevicePixels="True">
                             <Border x:Name="Bg" Background="Transparent" BorderThickness="0"/>
 
-                            <ContentPresenter x:Name="HeaderHost"
-                                              ContentSource="Header"
-                                              Margin="{TemplateBinding Padding}"
-                                              VerticalAlignment="Center"
-                                              RecognizesAccessKey="True"/>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="CheckMark"
+                                           Text="✓"
+                                           Visibility="Collapsed"
+                                           Foreground="{StaticResource AccentBrush}"
+                                           Margin="8,0,-4,0"
+                                           VerticalAlignment="Center"
+                                           FontWeight="Bold"/>
 
+                                <ContentPresenter x:Name="HeaderHost"
+                                                  ContentSource="Header"
+                                                  Margin="{TemplateBinding Padding}"
+                                                  VerticalAlignment="Center"
+                                                  RecognizesAccessKey="True"/>
+                            </StackPanel>
                             <Popup x:Name="PART_Popup"
                                    AllowsTransparency="True"
                                    Focusable="False"
@@ -58,6 +67,10 @@
                         </Grid>
 
                         <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+
                             <Trigger Property="Role" Value="SubmenuHeader">
                                 <Setter TargetName="PART_Popup" Property="Placement" Value="Right"/>
                             </Trigger>
@@ -222,6 +235,9 @@
                 <MenuItem Header="驱动工具">
                     <MenuItem Header="安装虚拟网卡" Click="BtnInstall_Click"/>
                     <MenuItem Header="卸载虚拟网卡" Click="BtnUninstall_Click"/>
+                </MenuItem>
+                <MenuItem Header="设置">
+                    <MenuItem x:Name="MenuAutoStart" Header="开机自启动" IsCheckable="True" Click="MenuAutoStart_Click"/>
                 </MenuItem>
                 <MenuItem Header="帮助">
                     <MenuItem Header="关于软件">

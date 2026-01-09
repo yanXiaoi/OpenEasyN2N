@@ -6,12 +6,20 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using Microsoft.Win32;
 using OpenEasyN2N.manager;
 using OpenEasyN2N.model;
 using OpenEasyN2N.service;
 using OpenEasyN2N.util;
 using OpenEasyN2N.view;
 using Serilog;
+
+using Application = System.Windows.Application;
+using MessageBox = System.Windows.MessageBox;
+using Brushes = System.Windows.Media.Brushes;
+using System.Drawing; // 仅用于 Icon
+using Forms = System.Windows.Forms; // 给 WinForms 起别名，解决 Color/Brush 等冲突
+using Drawing = System.Drawing;    // 给 Drawing 起别名
 
 namespace OpenEasyN2N;
 
@@ -26,6 +34,8 @@ public partial class MainWindow : Window
     private const string GitHubUpdateUrl = "https://github.com/yanXiaoi/OpenEasyN2N/releases";
     private const string GiteeUpdateUrl = "https://gitee.com/yanxao/OpenEasyN2N/releases";
 
+    // 托盘对象
+    private NotifyIcon _notifyIcon = null!;
 
     public static MainWindow Instance;
     // 启动状态
@@ -53,6 +63,10 @@ public partial class MainWindow : Window
         //读取配置
         _config = AppTool.GetFileData("config/config.json", new N2NConfig());
         InitializeComponent();
+        // 初始化托盘
+        this.InitNotifyIcon();
+        // 初始化自启勾选状态
+        this.InitAutoStartStatus();
         //注入配置
         ApplyConfigToUi(_config);
         Instance = this;
@@ -74,7 +88,7 @@ public partial class MainWindow : Window
     // 关闭逻辑
     private void BtnClose_Click(object sender, RoutedEventArgs e)
     {
-        Application.Current.Shutdown(); // 彻底退出程序
+        this.Hide(); // 隐藏窗口
     }
 
     // 连接supernode
@@ -423,7 +437,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            string json = Clipboard.GetText();
+            string json = System.Windows.Clipboard.GetText();
             if (string.IsNullOrEmpty(json))
             {
                 MessageBox.Show("剪贴板中没有内容！");
@@ -472,7 +486,7 @@ public partial class MainWindow : Window
         {
             N2NConfig currentConfig = GetConfigFromUi();
             string json = JsonSerializer.Serialize(currentConfig);
-            Clipboard.SetText(json);
+            System.Windows.Clipboard.SetText(json);
             MessageBox.Show("配置已复制到剪贴板！");
         }
         catch (Exception ex)
@@ -563,4 +577,106 @@ public partial class MainWindow : Window
             }
         }
     }
+
+    #region 开机自启逻辑
+    private const string StartupKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
+    private const string AppName = "OpenEasyN2N";
+    /// <summary>
+    /// 检查并初始化开机自启菜单状态
+    /// </summary>
+    private void InitAutoStartStatus()
+    {
+        try
+        {
+            using RegistryKey key = Registry.CurrentUser.OpenSubKey(StartupKey);
+            if (key != null)
+            {
+                // 如果注册表里有这个路径，说明已开启 [cite: 110]
+                string value = key.GetValue(AppName) as string;
+                MenuAutoStart.IsChecked = !string.IsNullOrEmpty(value);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "读取自启注册表失败");
+        }
+    }
+
+    private void MenuAutoStart_Click(object sender, RoutedEventArgs e)
+    {
+        bool isStart = MenuAutoStart.IsChecked;
+        if (SetAutoStart(isStart))
+        {
+            MessageBox.Show(isStart ? "已成功开启开机自启动" : "已关闭开机自启动");
+        }
+        else
+        {
+            // 失败时回滚勾选状态
+            MenuAutoStart.IsChecked = !isStart;
+        }
+    }
+
+    /// <summary>
+    /// 写入或删除注册表
+    /// </summary>
+    public bool SetAutoStart(bool onOff)
+    {
+        try
+        {
+            // 获取当前程序的可执行文件完整路径
+            string appPath = Process.GetCurrentProcess().MainModule.FileName;
+            using RegistryKey key = Registry.CurrentUser.OpenSubKey(StartupKey, true);
+            if (onOff)
+            {
+                key.SetValue(AppName, $"\"{appPath}\""); // 加引号防止空格路径解析错误
+            }
+            else
+            {
+                key.DeleteValue(AppName, false);
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "操作注册表失败");
+            MessageBox.Show("设置失败，请尝试以管理员权限运行程序。");
+            return false;
+        }
+    }
+    #endregion
+
+
+
+    #region 托盘逻辑
+    private void InitNotifyIcon()
+    {
+        _notifyIcon = new Forms.NotifyIcon();
+        _notifyIcon.Text = "OpenEasyN2N";
+        try {
+            _notifyIcon.Icon = Drawing.Icon.ExtractAssociatedIcon(Process.GetCurrentProcess().MainModule.FileName);
+        } catch (Exception ex) {
+            Log.Error(ex,"获取图标失败");
+            return;
+        }
+        _notifyIcon.Visible = true;
+        // 托盘右键菜单
+        ContextMenuStrip menu = new ContextMenuStrip();
+        menu.Items.Add("显示主界面", null, (s, e) => ShowMainWindow());
+        menu.Items.Add(new Forms.ToolStripSeparator());
+        menu.Items.Add("退出程序", null, (s, e) => {
+            _notifyIcon.Dispose(); // 必须释放，否则图标会残留
+            Application.Current.Shutdown();
+        });
+        _notifyIcon.ContextMenuStrip = menu;
+        // 双击托盘显示
+        _notifyIcon.DoubleClick += (s, e) => ShowMainWindow();
+    }
+
+    private void ShowMainWindow()
+    {
+        this.Show();
+        this.WindowState = WindowState.Normal;
+        this.Activate();
+    }
+    #endregion
 }
