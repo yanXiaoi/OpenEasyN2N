@@ -4,6 +4,7 @@ using System.Windows;
 using OpenEasyN2N.manager;
 using OpenEasyN2N.service;
 using OpenEasyN2N.util;
+using OpenEasyN2N.view;
 using Serilog;
 
 using Application = System.Windows.Application;
@@ -16,6 +17,8 @@ namespace OpenEasyN2N;
 /// </summary>
 public partial class App : Application
 {
+    // 定义一个唯一的 Mutex 名称，建议使用 GUID 或 程序集的全名
+    private static Mutex? _mutex;
     public App()
     {
         InitializeComponent();
@@ -31,7 +34,7 @@ public partial class App : Application
         initLog();
         Log.Information("===== OpenEasyN2N 程序启动 =====");
         init();
-        //启动监听
+        // 启动监听
         N2NManagementService.Start();
         Log.Information("程序运行目录: {BaseDir}", AppDomain.CurrentDomain.BaseDirectory);
     }
@@ -86,5 +89,31 @@ public partial class App : Application
             MessageBox.Show("虚拟网卡初始化失败");
             Application.Current.Shutdown();
         }
+    }
+
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        const string appName = "OpenEasyN2N"; // 确保此字符串全局唯一
+        // 尝试创建一个命名的互斥体
+        _mutex = new Mutex(true, appName, out bool createdNew);
+        if (!createdNew)
+        {
+            // 如果互斥体已存在，说明已有实例在运行
+            MessageBox.Show("程序已经在运行中。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            // 退出当前尝试启动的实例
+            Application.Current.Shutdown();
+            return;
+        }
+        base.OnStartup(e);
+    }
+    protected override void OnExit(ExitEventArgs e)
+    {
+        // 程序退出时释放 Mutex
+        if (_mutex != null)
+        {
+            _mutex.ReleaseMutex();
+            _mutex.Dispose();
+        }
+        base.OnExit(e);
     }
 }

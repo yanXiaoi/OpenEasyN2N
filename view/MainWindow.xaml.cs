@@ -1,11 +1,11 @@
 ﻿using System.Diagnostics;
 using System.IO;
 using System.Net.NetworkInformation;
+using System.ServiceProcess;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
 using Microsoft.Win32;
 using OpenEasyN2N.manager;
 using OpenEasyN2N.model;
@@ -17,7 +17,6 @@ using Serilog;
 using Application = System.Windows.Application;
 using MessageBox = System.Windows.MessageBox;
 using Brushes = System.Windows.Media.Brushes;
-using System.Drawing; // 仅用于 Icon
 using Forms = System.Windows.Forms; // 给 WinForms 起别名，解决 Color/Brush 等冲突
 using Drawing = System.Drawing;    // 给 Drawing 起别名
 
@@ -33,6 +32,12 @@ public partial class MainWindow : Window
     private const string GiteeBaseUrl = "https://gitee.com/yanxao/OpenEasyN2N";
     private const string GitHubUpdateUrl = "https://github.com/yanXiaoi/OpenEasyN2N/releases";
     private const string GiteeUpdateUrl = "https://gitee.com/yanxao/OpenEasyN2N/releases";
+
+    //服务名称
+    private const string ServiceName = "OpenEasyN2N_Service";
+    //当前是否是已服务运行
+    private bool isService;
+
 
     // 托盘对象
     private NotifyIcon _notifyIcon = null!;
@@ -58,6 +63,8 @@ public partial class MainWindow : Window
     private PeersWindow _peersWindow;
     // 显示Ping工具窗口
     private PingWindow _pingWindow;
+    // 联机工具
+    private ToolboxWindow _winIPBroadcastWindow;
 
     public MainWindow() {
         //读取配置
@@ -70,6 +77,8 @@ public partial class MainWindow : Window
         //注入配置
         ApplyConfigToUi(_config);
         Instance = this;
+        //判断服务是否正在运行
+        CheckServiceStatus();
         // 启动异步任务
         this.StartTask();
     }
@@ -134,7 +143,11 @@ public partial class MainWindow : Window
             {
                 this.StartButton.Content = "停止中...";
                 this.StartButton.Background = Brushes.DarkGray;
-                N2NClientService.StopN2N();
+                //是否是服务运行中
+                if (this.isService)
+                    StopServiceTemporarily();
+                else
+                    N2NClientService.StopN2N();
             }
         }
         catch (Exception exception)
@@ -215,6 +228,18 @@ public partial class MainWindow : Window
         _pingWindow.Show();
     }
 
+    private void BtnShowWinIPBroadcast(object sender, RoutedEventArgs e)
+    {
+        // 如果窗口已经打开且在显示中，则激活它，不再新建
+        if (_winIPBroadcastWindow != null && _winIPBroadcastWindow.IsLoaded)
+        {
+            _winIPBroadcastWindow.Activate();
+            _winIPBroadcastWindow.Focus(); // 确保获得焦点
+            return;
+        }
+        _winIPBroadcastWindow = new ToolboxWindow();
+        _winIPBroadcastWindow.Show();
+    }
 
 
     private async void StartTask()
@@ -380,9 +405,20 @@ public partial class MainWindow : Window
         ExtraArgsTextBox.Focus();
     }
 
+    // 打开日志
     private void BtnLog_Click(object sender, RoutedEventArgs e)
     {
-        string logDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs", "log.txt");
+        string logDir;
+        //如果当前是服务
+        if (isService)
+        {
+            logDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs", "service_info.log");
+        }
+        else
+        {
+            logDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs", "log.txt");
+        }
+
         // 检查日志文件是否存在
         if (File.Exists(logDir))
         {
@@ -629,10 +665,13 @@ public partial class MainWindow : Window
             if (onOff)
             {
                 key.SetValue(AppName, $"\"{appPath}\""); // 加引号防止空格路径解析错误
+                //注册服务
+                registerService();
             }
             else
             {
                 key.DeleteValue(AppName, false);
+                deleteService();
             }
             return true;
         }
@@ -643,9 +682,149 @@ public partial class MainWindow : Window
             return false;
         }
     }
+
+
+// 注册服务
+    private void registerService()
+    {
+        try
+        {
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string nssmPath = Path.Combine(baseDir, "resources", "toolkit", "nssm.exe");
+            string hostPath = Path.Combine(baseDir, "N2NServiceHost.exe");
+            if (!File.Exists(nssmPath)) throw new Exception("找不到 nssm.exe，请检查资源目录");
+            // 安装服务
+            RunCommand(nssmPath, $"install {ServiceName} {hostPath}");
+            // 停止服务
+            RunCommand(nssmPath, $"stop {ServiceName}");
+            // 设置服务的工作目录（确保宿主能找到 config 文件夹）
+            RunCommand(nssmPath, $"set {ServiceName} AppDirectory {baseDir}");
+            // 设置服务描述
+            RunCommand(nssmPath, $"set {ServiceName} Description \"OpenEasyN2N 后台核心服务，支持未登录自动连接\"");
+            // 设置启动类型为自动
+            RunCommand(nssmPath, $"set {ServiceName} Start SERVICE_AUTO_START");
+            // 设置nssm日志路径
+            RunCommand(nssmPath, $"set {ServiceName} AppStdout \"{Path.Combine(baseDir, "logs", "service_info.log")}\"");
+            RunCommand(nssmPath, $"set {ServiceName} AppStderr \"{Path.Combine(baseDir, "logs", "service_err.log")}\"");
+            // 设置“创建处置”参数，使日志在启动时被覆盖（清空）
+            // 2 代表 CREATE_ALWAYS，这会强制在服务启动时重新创建文件
+            RunCommand(nssmPath, $"set {ServiceName} AppStdoutCreationDisposition 2");
+            RunCommand(nssmPath, $"set {ServiceName} AppStderrCreationDisposition 2");
+            Log.Information("N2N 服务注册成功");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "注册服务失败");
+            throw;
+        }
+    }
+
+// 删除服务
+    private void deleteService()
+    {
+        try
+        {
+            string nssmPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "resources", "toolkit", "nssm.exe");
+            // 停止并移除服务 (confirm 参数跳过二次确认)
+            RunCommand(nssmPath, $"stop {ServiceName}");
+            RunCommand(nssmPath, $"remove {ServiceName} confirm");
+            Log.Information("N2N 服务卸载成功");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "删除服务失败");
+        }
+    }
+    // 通用的静默执行命令工具
+    private void RunCommand(string fileName, string args)
+    {
+        using var p = Process.Start(new ProcessStartInfo
+        {
+            FileName = fileName,
+            Arguments = args,
+            CreateNoWindow = true,
+            UseShellExecute = false,
+            Verb = "runas" // 申请管理员权限
+        });
+        p?.WaitForExit();
+    }
+
+
+    private void CheckServiceStatus()
+    {
+        try
+        {
+            using ServiceController sc = new ServiceController(ServiceName);
+            // 如果服务正在运行或正在启动
+            if (sc.Status == ServiceControllerStatus.Running ||
+                sc.Status == ServiceControllerStatus.StartPending)
+            {
+                this.isService = true;
+                this.StartStatus = true;
+                this.StartButton.Content = "停止连接";
+                this.StartButton.Background = Brushes.OrangeRed;
+
+                // 读取日志，获取当前ip
+                string logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs",  "service_info.log");
+                // 获取所有日志
+                string[] lens = AppTool.ReadFile(logPath).Split("\n");
+                // 循环每一行获取 ip
+                foreach (string line in lens)
+                {
+                    Log.Information("N2N服务：{line}",line);
+                    if (line.Contains("created local tap device IP:"))
+                    {
+                        var match = N2NClientService.IpRegex.Match(line);
+                        if (match.Success)
+                        {
+                            this.CurrentIpText.Text = match.Groups["ip"].Value;
+                        }
+                    }
+                    if (line.Contains("[OK] edge")) //连接服务器成功
+                    {
+                        Log.Information("已连接状态");
+                        this.StatusDot.Fill = AppTool.GetBrushColor("#00FF00");
+                        this.StatusText.Text = "已连接";
+                        break;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // 如果服务没安装，走普通流程
+            Log.Warning("无法获取服务状态，可能未安装服务: " + ex.Message);
+            this.StartStatus = false;
+        }
+    }
+
+    private async void StopServiceTemporarily()
+    {
+        try
+        {
+            using ServiceController sc = new ServiceController(ServiceName);
+            // 检查服务是否正在运行，如果在运行则停止
+            if (sc.Status == ServiceControllerStatus.Running || sc.Status == ServiceControllerStatus.StartPending)
+            {
+                // 等待服务真正停止，最多等待10秒
+                await Task.Run(() => {sc.Stop(); sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(10)); });
+            }
+            isService = false;
+            AppTool.RunUI(() =>
+            {
+                this.StartStatus = false;
+                this.CurrentIpText.Text = "0.0.0.0";
+                this.StartButton.Background = AppTool.GetBrushColor("#007ACC");
+                this.StartButton.Content = "启动连接";
+                this.StartButton.IsEnabled = true;
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("停止服务失败: " + ex.Message);
+        }
+    }
     #endregion
-
-
 
     #region 托盘逻辑
     private void InitNotifyIcon()

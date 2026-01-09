@@ -109,11 +109,11 @@ public class TapNetworkService {
     private static bool ConfigureAdapter(string currentName) {
         try {
             // 重命名并优化网卡
-            Log.Information("正在将网卡 {OldName} 重命名为 {NewName} 并设置跃点...", currentName, TargetAdapterName);
+            Log.Information("正在将网卡 {OldName} 重命名为 {NewName} ...", currentName, TargetAdapterName);
             // 重命名网卡
             RunProcess("netsh", $"interface set interface name=\"{currentName}\" newname=\"{TargetAdapterName}\"");
             // 设置跃点为 1 (最高优先级，解决联机搜不到房)
-            RunProcess("netsh", $"interface ip set interface \"{TargetAdapterName}\" metric=1");
+            // RunProcess("netsh", $"interface ip set interface \"{TargetAdapterName}\" metric=1");
             Log.Information("虚拟网卡配置成功");
             return true;
         }

@@ -161,4 +161,15 @@ public static class AppTool
             Log.Error(e, "保存数据失败");
         }
     }
+
+    // 只读文件
+    public static string ReadFile(string filePath)
+    {
+        // 使用 FileStream 并指定 FileShare.ReadWrite 允许在其他进程写入时进行读取
+        using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+        using (var reader = new StreamReader(stream))
+        {
+            return reader.ReadToEnd();
+        }
+    }
 }

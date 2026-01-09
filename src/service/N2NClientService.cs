@@ -10,7 +10,7 @@ namespace OpenEasyN2N.service;
 public class N2NClientService
 {
     private static Process? _edgeProcess;
-    private static readonly Regex IpRegex = new Regex(@"created local tap device IP:\s*(?<ip>(\d{1,3}\.){3}\d{1,3})", RegexOptions.Compiled);
+    public static readonly Regex IpRegex = new Regex(@"created local tap device IP:\s*(?<ip>(\d{1,3}\.){3}\d{1,3})", RegexOptions.Compiled);
     // 当前IP
     private static string currIp = "";
 

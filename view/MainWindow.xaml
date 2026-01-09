@@ -400,7 +400,7 @@
                     <Button Style="{StaticResource ToolButtonStyle}" Tag="🌐" Content="在线成员" Click="BtnShowPeers_Click"/>
                     <Button Style="{StaticResource ToolButtonStyle}" Tag="📜" Content="运行日志" Click="BtnLog_Click"/>
                     <Button Style="{StaticResource ToolButtonStyle}" Tag="⚡" Content="Ping工具" Click="BtnShowPing_Click"/>
-                    <Button Style="{StaticResource ToolButtonStyle}" Tag="⚙" Content="更多工具"/>
+                    <Button Style="{StaticResource ToolButtonStyle}" Tag="⚙" Content="联机工具" Click="BtnShowWinIPBroadcast"/>
                 </UniformGrid>
             </Border>
 

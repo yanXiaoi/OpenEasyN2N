@@ -27,6 +27,7 @@
       <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
       <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
       <PackageReference Include="System.Management" Version="10.0.1" />
+      <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.1" />
     </ItemGroup>
 
     <ItemGroup>
@@ -35,5 +36,12 @@
         <XamlRuntime>Wpf</XamlRuntime>
         <SubType>Designer</SubType>
       </Page>
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="N2NServiceHost.exe" />
+      <Content Include="N2NServiceHost.exe">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 </Project>
