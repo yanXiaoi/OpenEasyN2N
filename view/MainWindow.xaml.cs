@@ -28,7 +28,7 @@ namespace OpenEasyN2N;
 public partial class MainWindow : Window
 {
     // 当前版本
-    private const string Version = "v1.0.1";
+    private const string Version = "v1.0.2";
     // URL 常量
     private const string GitHubBaseUrl = "https://github.com/yanXiaoi/OpenEasyN2N";
     private const string GiteeBaseUrl = "https://gitee.com/yanxao/OpenEasyN2N";
@@ -111,8 +111,12 @@ public partial class MainWindow : Window
         {
             if (!this.StartStatus)
             {
-                this.StartButton.Content = "连接中...";
-                this.StartButton.Background = Brushes.DarkGray;
+                this.StartButton.Background = Brushes.OrangeRed;
+                this.StartButton.Content = "停止连接";
+                this.StartButton.IsEnabled = true;
+
+                this.StartStatus = true;
+                this.StatusText.Text = "连接中...";
                 //保存配置
                 N2NConfig config = GetConfigFromUi();
                 AppTool.SaveDataToFile("config/config.json", config);
@@ -131,11 +135,6 @@ public partial class MainWindow : Window
                 {
                     AppTool.RunUI(() =>
                     {
-                        this.StartStatus = true;
-                        this.StartButton.Background = Brushes.OrangeRed;
-                        this.StartButton.Content = "停止连接";
-                        this.StartButton.IsEnabled = true;
-
                         this.CurrentIpText.Text = ip;
                         this.StatusDot.Fill = AppTool.GetBrushColor("#00FF00");
                         this.StatusText.Text = "已连接";
